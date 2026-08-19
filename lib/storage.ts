@@ -9,6 +9,11 @@ export async function getProfiles(): Promise<MantraProfile[]> {
   return raw ? JSON.parse(raw) : [];
 }
 
+export async function getProfileById(id: string): Promise<MantraProfile | undefined> {
+  const profiles = await getProfiles();
+  return profiles.find((p) => p.id === id);
+}
+
 export async function saveProfile(profile: MantraProfile): Promise<void> {
   const profiles = await getProfiles();
   const index = profiles.findIndex((p) => p.id === profile.id);

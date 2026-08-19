@@ -4,6 +4,7 @@ import { ActivityIndicator, View } from "react-native";
 import "../global.css";
 import { AuthProvider, useAuth } from "../lib/auth-context";
 import { getUserAccount } from "../lib/storage";
+import { ToastProvider } from "../lib/toast-context";
 
 function RootNavigation() {
   const { user, initializing } = useAuth();
@@ -81,7 +82,9 @@ function RootNavigation() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigation />
+      <ToastProvider>
+        <RootNavigation />
+      </ToastProvider>
     </AuthProvider>
   );
 }

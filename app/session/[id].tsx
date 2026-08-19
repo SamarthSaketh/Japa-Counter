@@ -2,31 +2,55 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Undo2, X } from 'lucide-react-native';
-import React, { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import uuid from 'react-native-uuid';
 import { colors, gradients } from '../../constants/theme';
+import { getProfileById, saveSession } from '../../lib/storage';
+import { MantraProfile, SessionLog } from '../../lib/types';
 
 const RING_SIZE = 260;
 const STROKE = 10;
 const RADIUS = (RING_SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-// Swap for real profile lookup via useProfiles()/profileId
-const MOCK_PROFILE = {
-  name: 'Gayatri Mantra',
-  target: 108,
-  milestoneInterval: 50,
-  deityImageUri: undefined as string | undefined,
-};
+function getPeriod(): SessionLog['period'] {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
 
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+
+  const [profile, setProfile] = useState<MantraProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [count, setCount] = useState(0);
   const [malas, setMalas] = useState(0);
+  const [startedAt] = useState(() => Date.now());
+  const [saved, setSaved] = useState(false);
 
-  const target = MOCK_PROFILE.target;
+  useEffect(() => {
+    let mounted = true;
+    getProfileById(id).then((p) => {
+      if (mounted) {
+        setProfile(p ?? null);
+        setLoadingProfile(false);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  // Target ALWAYS from profile.defaultTarget. 108 fallback only if profile
+  // predates the field (old/migrated profile) - never as unconditional default.
+  const target = profile?.defaultTarget ?? 108;
+  const milestoneInterval = profile?.milestoneInterval ?? 50;
+
   const progress = useMemo(() => Math.min(count / target, 1), [count, target]);
   const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
   const isComplete = count >= target;
@@ -36,43 +60,92 @@ export default function SessionScreen() {
     const next = count + 1;
     setCount(next);
 
+    const vibrate = profile?.vibrationEnabled ?? true;
+
     if (next % 108 === 0) {
       setMalas((m) => m + 1);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } else if (next % MOCK_PROFILE.milestoneInterval === 0) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (vibrate) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (next % milestoneInterval === 0) {
+      if (vibrate) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (vibrate) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    if (next === target) {
+    if (next === target && vibrate) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [count, isComplete, target]);
+  }, [count, isComplete, target, milestoneInterval, profile]);
 
   const handleUndo = useCallback(() => {
     setCount((c) => Math.max(0, c - 1));
   }, []);
 
+  const finishSession = useCallback(async () => {
+    if (saved || count === 0 || !id) {
+      router.back();
+      return;
+    }
+    setSaved(true); // guard against double-save on rapid double-tap
+    const completedAt = Date.now();
+    const log: SessionLog = {
+      id: uuid.v4() as string,
+      profileId: id,
+      date: new Date().toISOString().slice(0, 10),
+      period: getPeriod(),
+      count,
+      target,
+      completed: count >= target,
+      startedAt,
+      completedAt,
+      durationSec: Math.round((completedAt - startedAt) / 1000),
+    };
+    await saveSession(log);
+    router.back();
+  }, [saved, count, id, target, startedAt, router]);
+
+  const handleOverlayPress = useCallback(() => {
+    if (isComplete) {
+      finishSession();
+    } else {
+      handleTap();
+    }
+  }, [isComplete, finishSession, handleTap]);
+
+  if (loadingProfile) {
+    return (
+      <View style={[StyleSheet.absoluteFill, styles.center]}>
+        <LinearGradient colors={gradients.screenBg} style={StyleSheet.absoluteFill} />
+        <ActivityIndicator color={colors.textOnDark} />
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <View style={[StyleSheet.absoluteFill, styles.center]}>
+        <LinearGradient colors={gradients.screenBg} style={StyleSheet.absoluteFill} />
+        <Text style={styles.profileName}>Profile not found</Text>
+        <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Text style={styles.hint}>Go back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
-    <Pressable style={{ flex: 1 }} onPress={handleTap}>
+    <Pressable style={{ flex: 1 }} onPress={handleOverlayPress}>
       <LinearGradient colors={gradients.screenBg} style={StyleSheet.absoluteFill} />
 
       {/* Top bar */}
       <View style={styles.topBar}>
-        <Pressable hitSlop={12} onPress={() => router.back()}>
+        <Pressable hitSlop={12} onPress={finishSession}>
           <X size={22} color={colors.textOnDarkMuted} />
         </Pressable>
-        <Text style={styles.profileName}>{MOCK_PROFILE.name}</Text>
+        <Text style={styles.profileName}>{profile.name}</Text>
         <Pressable hitSlop={12} onPress={handleUndo}>
           <Undo2 size={20} color={colors.textOnDarkMuted} />
         </Pressable>
       </View>
-
-      {/* Deity image anchor, shown above the ring per the reference app */}
-      {MOCK_PROFILE.deityImageUri && (
-        <Image source={{ uri: MOCK_PROFILE.deityImageUri }} style={styles.deityImage} />
-      )}
 
       {/* Center: ring + count */}
       <View style={styles.center}>
@@ -135,16 +208,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     letterSpacing: 0.3,
-  },
-  deityImage: {
-    position: 'absolute',
-    top: 110,
-    alignSelf: 'center',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   center: {
     flex: 1,

@@ -2,6 +2,7 @@ export interface MantraProfile {
   id: string;
   name: string;
   icon: string;
+  imageUri?: string | null;
   defaultTarget: number;
   milestoneInterval: number;
   milestonePhrase: string;

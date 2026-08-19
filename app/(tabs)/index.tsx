@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { Dimensions, FlatList, Pressable, Text, View } from "react-native";
+import { Dimensions, FlatList, Image, Pressable, Text, View } from "react-native";
 import { getProfiles, getViewMode, setViewMode } from "../../lib/storage";
 import { MantraProfile } from "../../lib/types";
 
@@ -56,12 +56,17 @@ export default function Home() {
           viewMode === "list" ? (
             <Pressable
               onPress={() => router.push(`/session/${item.id}`)}
-              className="bg-neutral-900 rounded-xl p-4"
+              className="bg-neutral-900 rounded-xl p-4 flex-row items-center gap-3"
             >
-              <Text className="text-white text-lg font-semibold">
-                {item.icon} {item.name}
-              </Text>
-              <Text className="text-gray-400 text-sm mt-1">Target: {item.defaultTarget}</Text>
+              {item.imageUri ? (
+                <Image source={{ uri: item.imageUri }} className="w-10 h-10 rounded-full" />
+              ) : (
+                <Text className="text-2xl">{item.icon}</Text>
+              )}
+              <View className="flex-1">
+                <Text className="text-white text-lg font-semibold">{item.name}</Text>
+                <Text className="text-gray-400 text-sm mt-1">Target: {item.defaultTarget}</Text>
+              </View>
             </Pressable>
           ) : (
             <Pressable
@@ -69,7 +74,11 @@ export default function Home() {
               style={{ width: TILE_SIZE, height: TILE_SIZE }}
               className="bg-neutral-900 rounded-xl items-center justify-center px-1"
             >
-              <Text className="text-3xl mb-1">{item.icon}</Text>
+              {item.imageUri ? (
+                <Image source={{ uri: item.imageUri }} className="w-12 h-12 rounded-full mb-1" />
+              ) : (
+                <Text className="text-3xl mb-1">{item.icon}</Text>
+              )}
               <Text className="text-white text-xs font-semibold text-center" numberOfLines={2}>
                 {item.name}
               </Text>
