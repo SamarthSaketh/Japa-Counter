@@ -12,17 +12,18 @@ function RootNavigation() {
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
 
-  useEffect(() => {
-    if (!user) {
-      setCheckingProfile(false);
-      return;
-    }
-    setCheckingProfile(true);
-    getUserAccount(user.uid).then((acc) => {
-      setHasProfile(!!acc?.displayName);
-      setCheckingProfile(false);
-    });
-  }, [user]);
+useEffect(() => {
+  if (!user) {
+    setCheckingProfile(false);
+    return;
+  }
+  if (hasProfile) return; // already confirmed — no need to re-check
+  setCheckingProfile(true);
+  getUserAccount(user.uid).then((acc) => {
+    setHasProfile(!!acc?.displayName);
+    setCheckingProfile(false);
+  });
+}, [user, segments, hasProfile]);
 
   useEffect(() => {
     if (initializing || checkingProfile) return;

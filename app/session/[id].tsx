@@ -1,138 +1,181 @@
-import { View, Text, Pressable, BackHandler } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState, useCallback } from "react";
-import * as Speech from "expo-speech";
-import * as Haptics from "expo-haptics";
-import { useKeepAwake } from "expo-keep-awake";
-import uuid from "react-native-uuid";
-import { getProfiles, saveSession } from "../../lib/storage";
-import { MantraProfile, SessionLog } from "../../lib/types";
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Undo2, X } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
+import { colors, gradients } from '../../constants/theme';
 
-function getPeriod(hour: number): 'morning' | 'afternoon' | 'evening' {
-  if (hour >= 4 && hour < 12) return 'morning';
-  if (hour >= 12 && hour < 17) return 'afternoon';
-  return 'evening';
-}
+const RING_SIZE = 260;
+const STROKE = 10;
+const RADIUS = (RING_SIZE - STROKE) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export default function Session() {
-  useKeepAwake();
-  const { id } = useLocalSearchParams<{ id: string }>();
+// Swap for real profile lookup via useProfiles()/profileId
+const MOCK_PROFILE = {
+  name: 'Gayatri Mantra',
+  target: 108,
+  milestoneInterval: 50,
+  deityImageUri: undefined as string | undefined,
+};
+
+export default function SessionScreen() {
+  const { profileId } = useLocalSearchParams<{ profileId: string }>();
   const router = useRouter();
-
-  const [profile, setProfile] = useState<MantraProfile | null>(null);
   const [count, setCount] = useState(0);
-  const [completed, setCompleted] = useState(false);
-  const countRef = useRef(0);
-  const startedAtRef = useRef(0);
-  const lastMilestoneRef = useRef(0);
-  const lockRef = useRef(false);
+  const [malas, setMalas] = useState(0);
 
-  useEffect(() => {
-    getProfiles().then((all) => {
-      const found = all.find((p) => p.id === id);
-      if (found) {
-        setProfile(found);
-        startedAtRef.current = Date.now();
-      }
-    });
-  }, [id]);
-
-  useEffect(() => {
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => true);
-    return () => sub.remove();
-  }, []);
-
-  const finishSession = useCallback(async () => {
-    if (!profile) return;
-    const now = Date.now();
-    const log: SessionLog = {
-      id: uuid.v4() as string,
-      profileId: profile.id,
-      date: new Date(startedAtRef.current).toISOString().slice(0, 10),
-      period: getPeriod(new Date(startedAtRef.current).getHours()),
-      count: countRef.current,
-      target: profile.defaultTarget,
-      completed: true,
-      startedAt: startedAtRef.current,
-      completedAt: now,
-      durationSec: Math.round((now - startedAtRef.current) / 1000),
-    };
-    await saveSession(log);
-
-    if (profile.audioMode === "voice" || profile.audioMode === "both") {
-      Speech.speak(`${profile.defaultTarget} ${profile.milestonePhrase}, chanting finished`);
-    }
-    if (profile.vibrationEnabled) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-    setCompleted(true);
-  }, [profile]);
+  const target = MOCK_PROFILE.target;
+  const progress = useMemo(() => Math.min(count / target, 1), [count, target]);
+  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
+  const isComplete = count >= target;
 
   const handleTap = useCallback(() => {
-    if (!profile || completed || lockRef.current) return;
+    if (isComplete) return;
+    const next = count + 1;
+    setCount(next);
 
-    countRef.current += 1;
-    const newCount = countRef.current;
-    setCount(newCount);
-
-    if (profile.vibrationEnabled) {
+    if (next % 108 === 0) {
+      setMalas((m) => m + 1);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (next % MOCK_PROFILE.milestoneInterval === 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
-    if (
-      newCount % profile.milestoneInterval === 0 &&
-      newCount !== lastMilestoneRef.current &&
-      newCount < profile.defaultTarget
-    ) {
-      lastMilestoneRef.current = newCount;
-      if (profile.audioMode === "voice" || profile.audioMode === "both") {
-        Speech.speak(`${newCount} ${profile.milestonePhrase}`);
-      }
-      if (profile.vibrationEnabled) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }
+    if (next === target) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+  }, [count, isComplete, target]);
 
-    if (newCount >= profile.defaultTarget) {
-      lockRef.current = true;
-      finishSession();
-    }
-  }, [profile, completed, finishSession]);
-
-  if (!profile) {
-    return (
-      <View className="flex-1 bg-black items-center justify-center">
-        <Text className="text-white">Loading...</Text>
-      </View>
-    );
-  }
-
-  if (completed) {
-    return (
-      <View className="flex-1 bg-black items-center justify-center px-6">
-        <Text className="text-white text-3xl font-bold mb-2">Session Complete</Text>
-        <Text className="text-gray-400 text-lg mb-8">
-          {count} / {profile.defaultTarget} — {profile.name}
-        </Text>
-        <Pressable
-          onPress={() => router.replace("/")}
-          className="bg-orange-600 rounded-xl px-8 py-4"
-        >
-          <Text className="text-white font-semibold text-base">Done</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const handleUndo = useCallback(() => {
+    setCount((c) => Math.max(0, c - 1));
+  }, []);
 
   return (
-    <Pressable
-      onPress={handleTap}
-      style={{ flex: 1 }}
-      className="bg-black items-center justify-center"
-    >
-      <Text className="text-gray-600 text-sm mb-2">{profile.name}</Text>
-      <Text className="text-white text-7xl font-bold">{count}</Text>
-      <Text className="text-gray-500 text-lg mt-2">/ {profile.defaultTarget}</Text>
+    <Pressable style={{ flex: 1 }} onPress={handleTap}>
+      <LinearGradient colors={gradients.screenBg} style={StyleSheet.absoluteFill} />
+
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <Pressable hitSlop={12} onPress={() => router.back()}>
+          <X size={22} color={colors.textOnDarkMuted} />
+        </Pressable>
+        <Text style={styles.profileName}>{MOCK_PROFILE.name}</Text>
+        <Pressable hitSlop={12} onPress={handleUndo}>
+          <Undo2 size={20} color={colors.textOnDarkMuted} />
+        </Pressable>
+      </View>
+
+      {/* Deity image anchor, shown above the ring per the reference app */}
+      {MOCK_PROFILE.deityImageUri && (
+        <Image source={{ uri: MOCK_PROFILE.deityImageUri }} style={styles.deityImage} />
+      )}
+
+      {/* Center: ring + count */}
+      <View style={styles.center}>
+        <View>
+          <Svg width={RING_SIZE} height={RING_SIZE}>
+            <Circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RADIUS}
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth={STROKE}
+              fill="none"
+            />
+            <Circle
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RADIUS}
+              stroke={isComplete ? colors.success : colors.primary}
+              strokeWidth={STROKE}
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={CIRCUMFERENCE}
+              strokeDashoffset={strokeDashoffset}
+              rotation="-90"
+              origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
+            />
+          </Svg>
+          <View style={styles.ringCenterText}>
+            <Text style={styles.countText}>{count}</Text>
+            <Text style={styles.targetText}>/ {target}</Text>
+          </View>
+        </View>
+
+        {malas > 0 && (
+          <Text style={styles.malaText}>
+            {malas} {malas === 1 ? 'mala' : 'malas'} complete
+          </Text>
+        )}
+
+        <Text style={styles.hint}>
+          {isComplete ? 'Session complete — tap outside to finish' : 'Tap anywhere to count'}
+        </Text>
+      </View>
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  topBar: {
+    position: 'absolute',
+    top: 56,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileName: {
+    color: colors.textOnDarkMuted,
+    fontSize: 14,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  deityImage: {
+    position: 'absolute',
+    top: 110,
+    alignSelf: 'center',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  ringCenterText: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countText: {
+    color: colors.textOnDark,
+    fontSize: 72,
+    fontWeight: '200',
+  },
+  targetText: {
+    color: colors.textOnDarkMuted,
+    fontSize: 15,
+    marginTop: 2,
+  },
+  malaText: {
+    color: colors.accentGold,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  hint: {
+    color: 'rgba(247,245,251,0.4)',
+    fontSize: 12,
+    letterSpacing: 0.3,
+  },
+});
