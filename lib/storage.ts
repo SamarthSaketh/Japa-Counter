@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MantraProfile, SessionLog } from './types';
+import { MantraProfile, SessionLog, UserAccount } from './types';
 
 const PROFILES_KEY = 'japa_profiles';
 const SESSIONS_KEY = 'japa_sessions';
@@ -46,4 +46,14 @@ export async function getViewMode(): Promise<'list' | 'grid'> {
 
 export async function setViewMode(mode: 'list' | 'grid'): Promise<void> {
   await AsyncStorage.setItem(VIEW_MODE_KEY, mode);
+}
+const USER_ACCOUNT_PREFIX = 'japa_user_account_';
+
+export async function getUserAccount(uid: string): Promise<UserAccount | null> {
+  const raw = await AsyncStorage.getItem(USER_ACCOUNT_PREFIX + uid);
+  return raw ? JSON.parse(raw) : null;
+}
+
+export async function saveUserAccount(account: UserAccount): Promise<void> {
+  await AsyncStorage.setItem(USER_ACCOUNT_PREFIX + account.uid, JSON.stringify(account));
 }

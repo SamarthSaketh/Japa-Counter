@@ -1,8 +1,8 @@
-import { View, Text, FlatList, Pressable } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
-import { useCallback, useState, useMemo } from "react";
-import { getSessions, getProfiles } from "../lib/storage";
-import { SessionLog, MantraProfile } from "../lib/types";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import { FlatList, Text, View } from "react-native";
+import { getProfiles, getSessions } from "../../lib/storage";
+import { MantraProfile, SessionLog } from "../../lib/types";
 
 interface DayGroup {
   date: string;
@@ -24,7 +24,6 @@ function computeStreak(sessions: SessionLog[]): number {
 }
 
 export default function History() {
-  const router = useRouter();
   const [sessions, setSessions] = useState<SessionLog[]>([]);
   const [profiles, setProfiles] = useState<MantraProfile[]>([]);
 
@@ -50,28 +49,16 @@ export default function History() {
       map[s.date].push(s);
     });
     return Object.entries(map)
-      .map(([date, list]) => ({
-        date,
-        sessions: list,
-        total: list.reduce((sum, s) => sum + s.count, 0),
-      }))
+      .map(([date, list]) => ({ date, sessions: list, total: list.reduce((sum, s) => sum + s.count, 0) }))
       .sort((a, b) => (a.date < b.date ? 1 : -1));
   }, [sessions]);
 
   const streak = useMemo(() => computeStreak(sessions), [sessions]);
-  const allTimeTotal = useMemo(
-    () => sessions.reduce((sum, s) => sum + s.count, 0),
-    [sessions]
-  );
+  const allTimeTotal = useMemo(() => sessions.reduce((sum, s) => sum + s.count, 0), [sessions]);
 
   return (
     <View className="flex-1 bg-black px-4 pt-16">
-      <View className="flex-row items-center justify-between mb-6">
-        <Text className="text-white text-2xl font-bold">History</Text>
-        <Pressable onPress={() => router.back()}>
-          <Text className="text-orange-500 text-base">Close</Text>
-        </Pressable>
-      </View>
+      <Text className="text-white text-2xl font-bold mb-6">History</Text>
 
       <View className="flex-row justify-between mb-6 bg-neutral-900 rounded-xl p-4">
         <View className="items-center flex-1">
@@ -92,9 +79,7 @@ export default function History() {
         data={grouped}
         keyExtractor={(item) => item.date}
         ListEmptyComponent={
-          <Text className="text-gray-400 text-center mt-10">
-            No sessions yet. Complete a japa to see it here.
-          </Text>
+          <Text className="text-gray-400 text-center mt-10">No sessions yet. Complete a japa to see it here.</Text>
         }
         renderItem={({ item }) => (
           <View className="bg-neutral-900 rounded-xl p-4 mb-3">
@@ -107,9 +92,7 @@ export default function History() {
                 <Text className="text-gray-400 capitalize">
                   {s.period} — {profileMap[s.profileId]?.name ?? "Unknown"}
                 </Text>
-                <Text className="text-gray-300">
-                  {s.count}/{s.target}
-                </Text>
+                <Text className="text-gray-300">{s.count}/{s.target}</Text>
               </View>
             ))}
           </View>

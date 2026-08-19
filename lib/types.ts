@@ -24,3 +24,11 @@ export interface SessionLog {
   completedAt: number;
   durationSec: number;
 }
+
+export interface UserAccount {
+  uid: string;
+  phoneNumber: string;
+  displayName: string;
+  photoUri?: string;
+  createdAt: number;
+}
