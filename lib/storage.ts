@@ -36,3 +36,14 @@ export async function saveSession(log: SessionLog): Promise<void> {
   sessions.unshift(log);
   await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
 }
+
+const VIEW_MODE_KEY = 'japa_view_mode';
+
+export async function getViewMode(): Promise<'list' | 'grid'> {
+  const raw = await AsyncStorage.getItem(VIEW_MODE_KEY);
+  return raw === 'grid' ? 'grid' : 'list';
+}
+
+export async function setViewMode(mode: 'list' | 'grid'): Promise<void> {
+  await AsyncStorage.setItem(VIEW_MODE_KEY, mode);
+}
