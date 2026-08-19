@@ -21,7 +21,7 @@ const MOCK_PROFILE = {
 };
 
 export default function SessionScreen() {
-  const { profileId } = useLocalSearchParams<{ profileId: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [count, setCount] = useState(0);
   const [malas, setMalas] = useState(0);

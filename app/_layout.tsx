@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Redirect, Stack, usePathname } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "../global.css";
@@ -7,45 +7,72 @@ import { getUserAccount } from "../lib/storage";
 
 function RootNavigation() {
   const { user, initializing } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
+  const pathname = usePathname();
+
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
 
-useEffect(() => {
-  if (!user) {
-    setCheckingProfile(false);
-    return;
-  }
-  if (hasProfile) return; // already confirmed — no need to re-check
-  setCheckingProfile(true);
-  getUserAccount(user.uid).then((acc) => {
-    setHasProfile(!!acc?.displayName);
-    setCheckingProfile(false);
-  });
-}, [user, segments, hasProfile]);
-
   useEffect(() => {
-    if (initializing || checkingProfile) return;
+    let mounted = true;
 
-    const inAuthGroup = segments[0] === "login";
-    const inCompleteProfile = segments[0] === "complete-profile";
+    const checkProfile = async () => {
+      if (!user) {
+        if (mounted) {
+          setHasProfile(false);
+          setCheckingProfile(false);
+        }
+        return;
+      }
 
-    if (!user && !inAuthGroup) {
-      router.replace("/login");
-    } else if (user && !hasProfile && !inCompleteProfile) {
-      router.replace("/complete-profile");
-    } else if (user && hasProfile && (inAuthGroup || inCompleteProfile)) {
-      router.replace("/(tabs)");
-    }
-  }, [user, initializing, checkingProfile, hasProfile, segments]);
+      setCheckingProfile(true);
+
+      try {
+        const account = await getUserAccount(user.uid);
+
+        if (mounted) {
+          setHasProfile(!!account?.displayName);
+        }
+      } catch (error) {
+        console.error("Failed to check profile:", error);
+
+        if (mounted) {
+          setHasProfile(false);
+        }
+      } finally {
+        if (mounted) {
+          setCheckingProfile(false);
+        }
+      }
+    };
+
+    checkProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   if (initializing || checkingProfile) {
     return (
-      <View className="flex-1 bg-black items-center justify-center">
+      <View className="flex-1 items-center justify-center bg-black">
         <ActivityIndicator color="#fff" />
       </View>
     );
+  }
+
+  const inAuth = pathname === "/login";
+  const inCompleteProfile = pathname === "/complete-profile";
+
+  if (!user && !inAuth) {
+    return <Redirect href="/login" />;
+  }
+
+  if (user && !hasProfile && !inCompleteProfile) {
+    return <Redirect href="/complete-profile" />;
+  }
+
+  if (user && hasProfile && (inAuth || inCompleteProfile)) {
+    return <Redirect href="/(tabs)" />;
   }
 
   return <Stack screenOptions={{ headerShown: false }} />;
