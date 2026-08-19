@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "344361384252",
+    "project_id": "japa-counter-6f6b6",
+    "storage_bucket": "japa-counter-6f6b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:344361384252:android:1e1fb2de27efb0d9100639",
+        "android_client_info": {
+          "package_name": "com.saketh.japacounter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA95xqeOCIUCIX7q3OfAcgNanhoRCPzCPk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

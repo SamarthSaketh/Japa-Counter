@@ -1,0 +1,38 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MantraProfile, SessionLog } from './types';
+
+const PROFILES_KEY = 'japa_profiles';
+const SESSIONS_KEY = 'japa_sessions';
+
+export async function getProfiles(): Promise<MantraProfile[]> {
+  const raw = await AsyncStorage.getItem(PROFILES_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function saveProfile(profile: MantraProfile): Promise<void> {
+  const profiles = await getProfiles();
+  const index = profiles.findIndex((p) => p.id === profile.id);
+  if (index >= 0) profiles[index] = profile;
+  else profiles.push(profile);
+  await AsyncStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+}
+
+export async function archiveProfile(id: string): Promise<void> {
+  const profiles = await getProfiles();
+  const index = profiles.findIndex((p) => p.id === id);
+  if (index >= 0) {
+    profiles[index].archived = true;
+    await AsyncStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+  }
+}
+
+export async function getSessions(): Promise<SessionLog[]> {
+  const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function saveSession(log: SessionLog): Promise<void> {
+  const sessions = await getSessions();
+  sessions.unshift(log);
+  await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+}
